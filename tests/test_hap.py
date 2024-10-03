@@ -1,3 +1,7 @@
+from pathlib import Path
+
+import pytest
+
 from hapless.hap import Hap
 
 
@@ -24,6 +28,7 @@ def test_unbound_hap(hap: Hap):
     assert hap.cmd == "false"
     assert hap.status == "failed"
     assert hap.env is None
+    assert hap.restarts == 0
     assert not hap.active
 
     assert not hap.stdout_path.exists()
@@ -32,3 +37,28 @@ def test_unbound_hap(hap: Hap):
     assert hap.end_time is None
 
     assert hap.runtime == "a moment"
+
+
+def test_hap_path_should_be_a_directory(tmp_path):
+    hap_path = Path(tmp_path) / "hap-path"
+    hap_path.touch()
+
+    with pytest.raises(ValueError) as e:
+        Hap(hap_path)
+
+    assert f"Path {hap_path} is not a directory" == str(e.value)
+
+
+def test_default_restarts(hap: Hap):
+    assert hap.restarts == 0
+
+
+def test_correct_restarts_value(tmp_path):
+    hap = Hap(Path(tmp_path), name="hap-name@2", cmd="true")
+    assert hap.restarts == 2
+
+
+def test_raw_name(tmp_path):
+    hap = Hap(Path(tmp_path), name="hap-name@3", cmd="true")
+    assert hap.name == "hap-name"
+    assert hap.raw_name == "hap-name@3"

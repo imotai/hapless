@@ -39,8 +39,11 @@ class Hap(object):
         name: Optional[str] = None,
         cmd: Optional[str] = None,
     ):
+        if not hap_path.is_dir():
+            raise ValueError(f"Path {hap_path} is not a directory")
+
         self._hap_path = hap_path
-        self._hid = os.path.basename(hap_path)
+        self._hid: str = hap_path.name
 
         self._pid_file = hap_path / "pid"
         self._rc_file = hap_path / "rc"
@@ -48,24 +51,24 @@ class Hap(object):
         self._cmd_file = hap_path / "cmd"
         self._env_file = hap_path / "env"
 
-        self._set_name(name)
+        self._set_raw_name(name)
         self._set_cmd(cmd)
 
-    def _set_name(self, name: Optional[str]):
+    def _set_raw_name(self, raw_name: Optional[str]):
         """
         Sets name for the first time on hap creation.
         """
-        if name is None:
+        if raw_name is None:
             suffix = self.get_random_name()
-            name = f"hap-{suffix}"
+            raw_name = f"hap-{suffix}"
 
-        if self.name is None:
+        if self.raw_name is None:
             with open(self._name_file, "w") as f:
-                f.write(name)
+                f.write(raw_name)
 
     def _set_cmd(self, cmd: Optional[str]):
         """
-        Sets cmd for the first tiem on hap creation.
+        Sets cmd for the first time on hap creation.
         """
         if self.cmd is None:
             if cmd is None:
@@ -108,7 +111,7 @@ class Hap(object):
             logger.error(f"Cannot bind due to {e}")
 
     @staticmethod
-    def get_random_name(length: int = 6):
+    def get_random_name(length: int = 6) -> str:
         return "".join(
             random.sample(
                 string.ascii_lowercase + string.digits,
@@ -187,7 +190,7 @@ class Hap(object):
         return self.proc is not None
 
     @property
-    def hid(self) -> int:
+    def hid(self) -> str:
         return self._hid
 
     @property
@@ -208,23 +211,35 @@ class Hap(object):
 
     @property
     @allow_missing
-    def name(self) -> Optional[str]:
+    def raw_name(self) -> Optional[str]:
         with open(self._name_file) as f:
             return f.read().strip()
 
+    @cached_property
+    def name(self) -> str:
+        """
+        Base name without restarts counter.
+        """
+        return self.raw_name.split(config.RESTART_DELIM)[0]
+
+    @cached_property
+    def restarts(self) -> int:
+        _, *rest = self.raw_name.rsplit("@", maxsplit=1)
+        return int(rest[0]) if rest else 0
+
     @property
-    def path(self):
+    def path(self) -> Path:
         return self._hap_path
 
     @property
-    def stdout_path(self):
+    def stdout_path(self) -> Path:
         return self._hap_path / "stdout.log"
 
     @property
-    def stderr_path(self):
+    def stderr_path(self) -> Path:
         return self._hap_path / "stderr.log"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"#{self.hid} ({self.name})"
 
     def __rich__(self) -> str:
